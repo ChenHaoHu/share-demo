@@ -1,0 +1,24 @@
+global:
+  scrape_interval:     1s
+  evaluation_interval: 60s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          instance: prometheus
+
+  - job_name: server01
+    static_configs:
+      - targets: ['docker.for.mac.host.internal:9091']
+        labels:
+          instance: server01
+          desc: "未添加获取文件描述符代码"
+
+  - job_name: server02
+    static_configs:
+      - targets: ['docker.for.mac.host.internal:9092']
+        labels:
+          instance: server02
+          desc: "添加了获取文件描述符代码"

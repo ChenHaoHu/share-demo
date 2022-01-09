@@ -27,15 +27,15 @@ func main() {
 		tcpConn := conn.(*net.TCPConn)
 		seq := atomic.AddInt32(&execCount, 1)
 		go handConn(tcpConn, seq)
-		log.Println("submit exec seq: ", seq)
+		//log.Println("submit exec seq: ", seq)
 	}
 }
 
 func handConn(conn *net.TCPConn, seq int32) {
-	log.Println("start exec seq: ", seq)
+	//log.Println("start exec seq: ", seq)
 
 	defer func() {
-		log.Println("end exec seq: ", seq)
+		//log.Println("end exec seq: ", seq)
 	}()
 
 	defer func() {
@@ -63,7 +63,7 @@ func handConn(conn *net.TCPConn, seq int32) {
 		log.Println(err)
 		return
 	}
-	log.Printf("seq: %d recv: %s", seq, revBuf)
+	//log.Printf("seq: %d recv: %s", seq, revBuf)
 
 	_, err = conn.Write([]byte("back msg"))
 	if err != nil {

@@ -27,15 +27,15 @@ func main() {
 		tcpConn := conn.(*net.TCPConn)
 		seq := atomic.AddInt32(&execCount, 1)
 		go handConn(tcpConn, seq)
-		log.Println("submit exec seq: ", seq)
+		//log.Println("submit exec seq: ", seq)
 	}
 }
 
 func handConn(conn *net.TCPConn, seq int32) {
-	log.Println("start exec seq: ", seq)
+	//log.Println("start exec seq: ", seq)
 
 	defer func() {
-		log.Println("end exec seq: ", seq)
+		//log.Println("end exec seq: ", seq)
 	}()
 
 	defer func() {
@@ -52,10 +52,11 @@ func handConn(conn *net.TCPConn, seq int32) {
 	defer func() {
 		_ = file.Close()
 	}()
-	fd := file.Fd()
-	log.Printf("conn fd: %d", fd)
+	file.Fd()
+	//fd := file.Fd()
+	//log.Printf("conn fd: %d", fd)
 	/**********************************/
-	conn.SyscallConn()
+
 	//接收消息后发送一次消息 然后主动结束
 	revBuf := make([]byte, 100, 100)
 	_, err = conn.Read(revBuf)
@@ -63,7 +64,7 @@ func handConn(conn *net.TCPConn, seq int32) {
 		log.Println(err)
 		return
 	}
-	log.Printf("seq: %d recv: %s", seq, revBuf)
+	//log.Printf("seq: %d recv: %s", seq, revBuf)
 
 	_, err = conn.Write([]byte("back msg"))
 	if err != nil {

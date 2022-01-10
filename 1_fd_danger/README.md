@@ -69,7 +69,6 @@ func handConn(conn *net.TCPConn, seq int32) {
 因为这是处理连接开始的地方，我还检查了好几次，还为自己没忘记给file对象延迟关闭感到窃喜，然后万万没想到啊，就因为加了这几行代码，我的程序线程数量爆发式增长。
 
 ### 我们来复现一下，来一个对比实验
-
 #### 1 客户端配置
 
 
@@ -366,7 +365,22 @@ SetNonblock 就是非阻塞的设置，这没问题啊，那难道是在中间�
 我一脸懵逼的看了下获取文件描述符的源码，真相了，兄弟们，这里果然有坑！
 
 ```golang
-func (f *File) Fd() uintptr {  if f == nil {    return ^(uintptr(0))  }  // If we put the file descriptor into nonblocking mode,  // then set it to blocking mode before we return it,  // because historically we have always returned a descriptor  // opened in blocking mode. The File will continue to work,  // but any blocking operation will tie up a thread.  if f.nonblock {    f.pfd.SetBlocking()  }  return uintptr(f.pfd.Sysfd)}
+func (f *File) Fd() uintptr {
+  if f == nil {
+    return ^(uintptr(0))
+  }
+
+  // If we put the file descriptor into nonblocking mode,
+  // then set it to blocking mode before we return it,
+  // because historically we have always returned a descriptor
+  // opened in blocking mode. The File will continue to work,
+  // but any blocking operation will tie up a thread.
+  if f.nonblock {
+    f.pfd.SetBlocking()
+  }
+
+  return uintptr(f.pfd.Sysfd)
+}
 ```
 
 根据我的方式获取文件描述符的时候会把当前的 fd 设置成阻塞的，但是并不知道为啥这么做，看了社区的 ISSUE(#29277)，很多人也和我一样遇到了这个问题，官方没说为啥这么做。
@@ -377,7 +391,22 @@ func (f *File) Fd() uintptr {  if f == nil {    return ^(uintptr(0))  }  // If w
 
 
 ```golang
-//https://github.com/panjf2000/gnet/blob/master/client.go#L138rc, err := conn.SyscallConn() if err != nil {  return nil, errors.New("failed to get syscall.RawConn from net.Conn") } var DupFD int e := rc.Control(func(fd uintptr) {    DupFD, err = unix.Dup(int(fd)) }) if err != nil {  return nil, err } if e != nil {  return nil, e }
+//https://github.com/panjf2000/gnet/blob/master/client.go#L138
+rc, err := conn.SyscallConn()
+ if err != nil {
+  return nil, errors.New("failed to get syscall.RawConn from net.Conn")
+ }
+
+ var DupFD int
+ e := rc.Control(func(fd uintptr) {
+    DupFD, err = unix.Dup(int(fd))
+ })
+ if err != nil {
+  return nil, err
+ }
+ if e != nil {
+  return nil, e
+ }
 ```
 
 这里需要注意下，我们通过此方式获取 fd 的时候，需要 dup 一下，如果不 dup 我们就不能关联引用，但是 dup 后记得主动 close，不然可能会导致资源泄漏。
@@ -392,7 +421,17 @@ func (f *File) Fd() uintptr {  if f == nil {    return ^(uintptr(0))  }  // If w
 想简单试试的伙计，下面给个例子，可以自定义一下 http server 的 ConnContext 方法，后面每次 Accept 到连接都会执行此方法。
 
 ```golang
-//server: http server  server.ConnContext = func(ctx context.Context, c net.Conn) context.Context {    tcpConn := c.(*net.TCPConn)    file, err := tcpConn.File()    if err != nil {      log.Println(err)      return ctx    }    file.Fd()    return ctx  }
+//server: http server
+  server.ConnContext = func(ctx context.Context, c net.Conn) context.Context {
+    tcpConn := c.(*net.TCPConn)
+    file, err := tcpConn.File()
+    if err != nil {
+      log.Println(err)
+      return ctx
+    }
+    file.Fd()
+    return ctx
+  }
 ```
 
 ### 总结
